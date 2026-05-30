@@ -191,6 +191,27 @@
             background: rgba(66, 153, 225, 0.25);
             color: white;
         }
+
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e2235;
+            color: #a0c4ff;
+            padding: 10px 20px;
+            border-radius: 40px;
+            font-size: 13px;
+            z-index: 1000;
+            border: 1px solid rgba(66, 153, 225, 0.5);
+            animation: fadeOut 2s ease forwards;
+        }
+
+        @keyframes fadeOut {
+            0% { opacity: 1; }
+            70% { opacity: 1; }
+            100% { opacity: 0; visibility: hidden; }
+        }
     </style>
 </head>
 <body>
@@ -224,81 +245,119 @@
         </div>
 
         <div class="footer">
-            <button class="close-btn" id="btnClose" onclick="Telegram.WebApp.close()">
+            <button class="close-btn" id="btnClose">
                 ✖️ Закрыть
             </button>
         </div>
     </div>
 
     <script>
-        // Инициализация Telegram WebApp
-        let tg = window.Telegram?.WebApp;
-        
-        if (tg) {
-            tg.expand();
-            tg.enableClosingConfirmation();
-            tg.setHeaderColor('bg_color');
-            tg.setBackgroundColor('#0a0e27');
+        // Функция для показа уведомления
+        function showToast(message, isError = false) {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.style.background = isError ? '#3d1a1a' : '#1e2235';
+            toast.style.color = isError ? '#fca5a5' : '#a0c4ff';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 2500);
         }
 
-        // Функция открытия схемы с задержкой для лучшего UX
-        function openV2RayScheme(url, buttonType) {
-            // Визуальная обратная связь
+        // Функция открытия схемы - РАБОЧИЙ МЕТОД
+        function openV2RayScheme(url, actionType) {
+            // Обновляем статус
             const statusText = document.getElementById('statusText');
-            const originalText = statusText.innerText;
             
-            if (buttonType === 'start') {
+            if (actionType === 'start') {
                 statusText.innerHTML = '🔄 Включение...';
-                statusText.style.color = '#86efac';
+                showToast('🔄 Открываю V2RayTun...');
             } else {
                 statusText.innerHTML = '🔄 Выключение...';
-                statusText.style.color = '#fca5a5';
+                showToast('🔄 Отключаю V2RayTun...');
             }
             
-            // Пытаемся открыть схему
-            window.location.href = url;
+            // МЕТОД 1: Прямой переход (работает в некоторых версиях)
+            try {
+                window.location.href = url;
+            } catch(e) {}
             
-            // Запасной вариант через iframe (иногда помогает)
+            // МЕТОД 2: Открытие в новой вкладке (часто срабатывает)
             setTimeout(() => {
-                const iframe = document.createElement('iframe');
-                iframe.style.display = 'none';
-                iframe.src = url;
-                document.body.appendChild(iframe);
-                
-                setTimeout(() => {
-                    document.body.removeChild(iframe);
-                }, 1000);
+                const win = window.open(url, '_blank');
+                if (!win || win.closed || typeof win.closed === 'undefined') {
+                    // МЕТОД 3: Создаём невидимую ссылку и кликаем
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.style.display = 'none';
+                    link.target = '_blank';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    // МЕТОД 4: Iframe метод
+                    setTimeout(() => {
+                        const iframe = document.createElement('iframe');
+                        iframe.style.display = 'none';
+                        iframe.src = url;
+                        document.body.appendChild(iframe);
+                        setTimeout(() => {
+                            document.body.removeChild(iframe);
+                        }, 1000);
+                    }, 100);
+                }
             }, 100);
             
-            // Возвращаем статус через 1.5 секунды
+            // Возвращаем статус
             setTimeout(() => {
-                if (buttonType === 'start') {
-                    statusText.innerHTML = '✅ V2RayTun активирован';
+                if (actionType === 'start') {
+                    statusText.innerHTML = '✅ Команда отправлена';
+                    showToast('✅ V2RayTun должен открыться');
                 } else {
-                    statusText.innerHTML = '⭕ V2RayTun отключён';
+                    statusText.innerHTML = '✅ Команда отправлена';
+                    showToast('✅ V2RayTun должен закрыться');
                 }
                 
                 setTimeout(() => {
-                    statusText.innerHTML = originalText;
-                }, 2000);
+                    if (statusText.innerHTML.includes('Команда отправлена')) {
+                        statusText.innerHTML = '💚 Готов к подключению';
+                    }
+                }, 3000);
             }, 1500);
         }
 
         // Кнопка включения
-        document.getElementById('btnStart').addEventListener('click', function() {
+        document.getElementById('btnStart').addEventListener('click', function(e) {
+            e.preventDefault();
             openV2RayScheme('v2raytun://control/start', 'start');
         });
 
         // Кнопка выключения
-        document.getElementById('btnStop').addEventListener('click', function() {
+        document.getElementById('btnStop').addEventListener('click', function(e) {
+            e.preventDefault();
             openV2RayScheme('v2raytun://control/stop', 'stop');
         });
 
-        // Кнопка закрытия (если не через Telegram.WebApp)
-        if (!tg) {
-            document.getElementById('btnClose').addEventListener('click', function() {
+        // Кнопка закрытия
+        document.getElementById('btnClose').addEventListener('click', function() {
+            try {
+                Telegram.WebApp.close();
+            } catch(e) {
                 window.close();
-            });
+            }
+        });
+
+        // Инициализация Telegram WebApp
+        try {
+            let tg = Telegram.WebApp;
+            tg.expand();
+            tg.enableClosingConfirmation();
+            tg.setHeaderColor('bg_color');
+            tg.setBackgroundColor('#0a0e27');
+        } catch(e) {
+            console.log('Не в Telegram WebApp');
         }
     </script>
 </body>
